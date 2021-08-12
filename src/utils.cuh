@@ -26,5 +26,5 @@ inline int GET_BLOCKS(const int N, const int Chunks) {
 
 inline void TypeCheck(const torch::Tensor &input) {
     //AT_ASSERTM(input.is_contiguous(), "input tensor has to be contiguous");
-    AT_ASSERTM(input.type().is_cuda(), "input must be a CUDA tensor");
+    AT_ASSERTM(input.is_cuda(), "input must be a CUDA tensor");
 }

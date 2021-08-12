@@ -10,6 +10,32 @@ def check(a, b):
     return ( (a-b).abs()[idx] / tmp[idx]) .max()
     return (a-b).abs().max()
 
+def test_correct2(h, w, c, kh, kw, casual_mask=False):
+    x1 = torch.rand(32, c, h, w).cuda()
+    y1 = torch.rand(8, c, h, w).cuda()
+    x2 = x1.clone()#.half()
+    y2 = y1.clone()#.half()
+    
+    x1.requires_grad_()
+    y1.requires_grad_()
+    x2.requires_grad_()
+    y2.requires_grad_()
+
+    y1t = y1.view(y1.shape[0], 1, c, h, w).expand(y1.shape[0], 4, c, h, w).reshape(-1, c, h, w)
+
+    z1 = TorchLocalAttention.f_similar(x1, y1t, kh, kw, casual_mask)
+    z2 = f_similar(x2, y2, kh, kw, casual_mask)
+    grad = torch.rand(z1.size()).cuda()
+
+    z1.backward(grad)
+    z2.backward(grad)
+
+    err1 = check(z1.data, z2.data)
+    err2 = check(x1.grad.data, x2.grad.data)
+    err3 = check(y1.grad.data, y2.grad.data)
+    print("maximum difference: {:.5f}\t{:.5f}\t{:.5f}".format(err1.item(), err2.item(), err3.item()))
+
+
     
 def test_correct(h, w, c, kh, kw, casual_mask=False):
     x1 = torch.rand(4, c, h, w).cuda()
@@ -121,15 +147,16 @@ def test_efficiency_backward(h, w, c, kh, kw, casual_mask=False):
 
 
 if __name__ == '__main__':
+    torch.cuda.seed_all()
     for im in [64]:
         for c in [64]:
             for block in [9]:
                 print("input:{} channel:{} block:{}".format(im, c, block))
-                # test_correct(im, im, c, block, block)
-                test_correct(im, im, c, block, block, True)
-                test_efficiency_forward(im, im, c, block, block)
-                test_efficiency_forward(im, im, c, block, block, True)
-                test_efficiency_backward(im, im, c, block, block)
-                test_efficiency_backward(im, im, c, block, block, True)
+                test_correct2(im, im, c, block, block)
+                # test_correct(im, im, c, block, block, True)
+                # test_efficiency_forward(im, im, c, block, block)
+                # test_efficiency_forward(im, im, c, block, block, True)
+                # test_efficiency_backward(im, im, c, block, block)
+                # test_efficiency_backward(im, im, c, block, block, True)
 
     

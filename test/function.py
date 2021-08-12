@@ -28,8 +28,8 @@ class similarFunction(Function):
         x_ori, x_loc = ctx.saved_tensors
         kH, kW = ctx.kHW
         casual_mask = ctx.casual_mask
-        grad_ori = similar_backward(x_loc, grad_outputs, kH, kW, True, casual_mask)
-        grad_loc = similar_backward(x_ori, grad_outputs, kH, kW, False, casual_mask)
+        grad_ori = similar_backward(x_loc, grad_outputs, kH, kW, x_loc.shape[0], True, casual_mask)
+        grad_loc = similar_backward(x_ori, grad_outputs, kH, kW, x_loc.shape[0], False, casual_mask)
 
         return grad_ori, grad_loc, None, None, None
 
@@ -50,7 +50,7 @@ class weightingFunction(Function):
         x_ori, x_weight = ctx.saved_tensors
         kH, kW = ctx.kHW
         casual_mask = ctx.casual_mask
-        grad_ori = weighting_backward_ori(x_weight, grad_outputs, kH, kW, casual_mask)
+        grad_ori = weighting_backward_ori(x_weight, grad_outputs, kH, kW, x_ori.shape[0], casual_mask)
         grad_weight = weighting_backward_weight(x_ori, grad_outputs, kH, kW, casual_mask)
 
         return grad_ori, grad_weight, None, None, None
@@ -101,8 +101,7 @@ class TorchLocalAttention(nn.Module):
         x_phi = x_phi.contiguous().view(n, c, kh * kw, h * w)
         x_phi = x_phi.permute(0, 3, 1, 2).contiguous()
         x_phi = x_phi.view(n * h * w, c, kh * kw)
-
-        out = torch.matmul(x_theta, x_phi)
+        out = x_theta @ x_phi
         out = out.view(n, h, w, kh * kw)
         if casual_mask:
             out = out[..., :kh * kw // 2 + 1]

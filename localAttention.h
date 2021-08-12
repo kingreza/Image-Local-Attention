@@ -21,6 +21,7 @@ torch::Tensor similar_cuda_backward(
         const torch::Tensor &grad_out,
         const int kH,
         const int kW,
+        const int batch_loc,
         const bool is_ori,
         const bool casual_mask
         );
@@ -37,6 +38,7 @@ torch::Tensor weighting_cuda_backward_ori(
         const torch::Tensor &grad_out,
         const int kH,
         const int kW,
+        const int batch_ori,
         const bool casual_mask);
 
 torch::Tensor weighting_cuda_backward_weight(

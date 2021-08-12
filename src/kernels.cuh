@@ -135,7 +135,8 @@ __global__ void ck2c_loc(
         const int width,
         const int per_channel,
         const int per_inp,
-        dt *y
+        dt *y,
+        const bool is_accumulate
 ) {
     // x_ori: {c, h, w}
     // x_weight: {h, w, k^2}
@@ -157,7 +158,12 @@ __global__ void ck2c_loc(
                         __ldg(x_weight + indexW * patch + indexK));
             }
         }
-        y[index] = static_cast<dt> (val);
+        if (is_accumulate) {
+            y[index] += static_cast<dt> (val);
+        }
+        else {
+            y[index] = static_cast<dt> (val);
+        }
     }
 }
 
@@ -227,11 +233,13 @@ void f_ck2c_loc(
         const int width,
         const int per_channel,
         const int per_inp,
-        dt *y) {
+        dt *y,
+        const bool is_accumulate=false
+        ) {
     ck2c_loc<dt, dtc> <<< GET_BLOCKS(min(per_inp, MAX_PIXELS_3d)), CUDA_NUM_THREADS, 0, stream >>> (
             x_ori, x_weight,
                     kH, kW, rH, rW,
                     patch, height, width,
                     per_channel, per_inp,
-                    y);
+                    y, is_accumulate);
 }

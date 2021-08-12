@@ -21,11 +21,13 @@ torch::Tensor similar_backward(
         const torch::Tensor &grad_out,
         const int kH,
         const int kW,
+        const int batch_loc,
         const bool is_ori,
         const bool casual_mask) {
     return similar_cuda_backward(
             x, grad_out,
             kH, kW,
+            batch_loc,
             is_ori, casual_mask);
 }
 
@@ -46,10 +48,11 @@ torch::Tensor weighting_backward_ori(
         const torch::Tensor &grad_out,
         const int kH,
         const int kW,
+        const int batch_ori,
         const bool casual_mask) {
     return weighting_cuda_backward_ori(
             x_weight, grad_out,
-            kH, kW, casual_mask);
+            kH, kW, batch_ori, casual_mask);
 }
 
 torch::Tensor weighting_backward_weight(
