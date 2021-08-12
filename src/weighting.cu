@@ -3,7 +3,8 @@
 torch::Tensor weighting_cuda_forward(
         const torch::Tensor &x_ori,
         const torch::Tensor &x_weight,
-        const int kH, const int kW
+        const int kH, const int kW,
+        const bool casual_mask
 ) {
     TypeCheck(x_ori);
     TypeCheck(x_weight);
@@ -11,10 +12,11 @@ torch::Tensor weighting_cuda_forward(
     const int channels = x_ori.size(1);
     const int height = x_ori.size(2);
     const int width = x_ori.size(3);
+    AT_ASSERTM(!casual_mask || (kH & 1 == 1 && kW & 1 == 1), "If casual_mask is true, the kernel size must be odd!");
 
     const int rH = kH >> 1;
     const int rW = kW >> 1;
-    const int patch = kH * kW;
+    const int patch = casual_mask ? (kH * kW >> 1) + 1: kH * kW;
     const int per_channel = height * width;
     const int per_input = per_channel * channels;
     const int per_output = per_channel * patch;
@@ -22,16 +24,31 @@ torch::Tensor weighting_cuda_forward(
 
     int start_inp = 0, start_out = 0;
     for (int i=0; i<batch; ++i) {
-        f_ck2c_ori<float, double> (
-                at::cuda::getCurrentCUDAStream(),
-                x_ori.data_ptr<float>() + start_inp,
-                x_weight.data_ptr<float>() + start_out,
-                kH, kW, rH, rW,
-                patch, channels,
-                height, width,
-                per_channel, per_input,
-                output.data_ptr<float>() + start_inp
-        );
+        // f_ck2c_ori<float, double> (
+        //         at::cuda::getCurrentCUDAStream(),
+        //         x_ori.data_ptr<float>() + start_inp,
+        //         x_weight.data_ptr<float>() + start_out,
+        //         kH, kW, rH, rW,
+        //         patch, channels,
+        //         height, width,
+        //         per_channel, per_input,
+        //         output.data_ptr<float>() + start_inp
+        // );
+        AT_DISPATCH_FLOATING_TYPES_AND_HALF(x_ori.type(), "weighting_cuda_forward", 
+            ([&] {
+                f_ck2c_ori<scalar_t, float> (
+                        at::cuda::getCurrentCUDAStream(),
+                        x_ori.data_ptr<scalar_t>() + start_inp,
+                        x_weight.data_ptr<scalar_t>() + start_out,
+                        kH, kW, rH, rW,
+                        patch, channels,
+                        height, width,
+                        per_channel, per_input,
+                        output.data_ptr<scalar_t>() + start_inp
+                );
+            }
+            )
+            );
         start_inp += per_input;
         start_out += per_output;
     }
@@ -44,7 +61,8 @@ torch::Tensor weighting_cuda_forward(
 torch::Tensor weighting_cuda_backward_ori(
         const torch::Tensor &x_weight,
         const torch::Tensor &grad_out,
-        const int kH, const int kW
+        const int kH, const int kW,
+        const bool casual_mask
 ) {
     TypeCheck(x_weight);
     const int batch = x_weight.size(0);
@@ -54,7 +72,7 @@ torch::Tensor weighting_cuda_backward_ori(
 
     const int rH = kH >> 1;
     const int rW = kW >> 1;
-    const int patch = kH * kW;
+    const int patch = casual_mask ? (kH * kW >> 1) + 1: kH * kW;
     const int per_channel = height * width;
     const int per_input = per_channel * channels;
     const int per_output = per_channel * patch;
@@ -63,16 +81,31 @@ torch::Tensor weighting_cuda_backward_ori(
     int start_inp = 0, start_out = 0;
     for (int i=0; i<batch; ++i) {
         auto grad_out_row = grad_out.select(0, i);
-        f_ck2c_loc<float, double> (
-                at::cuda::getCurrentCUDAStream(),
-                grad_out_row.data_ptr<float>(),
-                x_weight.data_ptr<float>() + start_out,
-                kH, kW, rH, rW,
-                patch, channels,
-                height, width,
-                per_channel, per_input,
-                grad_ori.data_ptr<float>() + start_inp
-        );
+        // f_ck2c_loc<float, double> (
+        //         at::cuda::getCurrentCUDAStream(),
+        //         grad_out_row.data_ptr<float>(),
+        //         x_weight.data_ptr<float>() + start_out,
+        //         kH, kW, rH, rW,
+        //         patch, channels,
+        //         height, width,
+        //         per_channel, per_input,
+        //         grad_ori.data_ptr<float>() + start_inp
+        // );
+        AT_DISPATCH_FLOATING_TYPES_AND_HALF(x_weight.type(), "weighting_cuda_backward_ori", 
+            ([&] {
+                f_ck2c_loc<scalar_t, float> (
+                        at::cuda::getCurrentCUDAStream(),
+                        grad_out_row.data_ptr<scalar_t>(),
+                        x_weight.data_ptr<scalar_t>() + start_out,
+                        kH, kW, rH, rW,
+                        patch, channels,
+                        height, width,
+                        per_channel, per_input,
+                        grad_ori.data_ptr<scalar_t>() + start_inp
+                );
+            }
+            )
+            );
         start_inp += per_input;
         start_out += per_output;
     }
@@ -85,7 +118,8 @@ torch::Tensor weighting_cuda_backward_ori(
 torch::Tensor weighting_cuda_backward_weight(
         const torch::Tensor &x_ori,
         const torch::Tensor &grad_out,
-        const int kH, const int kW
+        const int kH, const int kW,
+        const bool casual_mask
 ) {
     TypeCheck(x_ori);
     const int batch = x_ori.size(0);
@@ -95,7 +129,7 @@ torch::Tensor weighting_cuda_backward_weight(
 
     const int rH = kH >> 1;
     const int rW = kW >> 1;
-    const int patch = kH * kW;
+    const int patch = casual_mask ? (kH * kW >> 1) + 1: kH * kW;
     const int per_channel = height * width;
     const int per_input = per_channel * channels;
     const int per_output = per_channel * patch;
@@ -104,16 +138,31 @@ torch::Tensor weighting_cuda_backward_weight(
     int start_inp = 0, start_out = 0;
     for (int i=0; i<batch; ++i) {
         auto grad_out_row = grad_out.select(0, i);
-        f_cc2k<float, double> (
-                at::cuda::getCurrentCUDAStream(),
-                grad_out_row.data_ptr<float>(),
-                x_ori.data_ptr<float>() + start_inp,
-                kH, kW, rH, rW,
-                patch, channels,
-                height, width,
-                per_channel,
-                grad_weight.data_ptr<float>() + start_out
-        );
+        // f_cc2k<float, double> (
+        //         at::cuda::getCurrentCUDAStream(),
+        //         grad_out_row.data_ptr<float>(),
+        //         x_ori.data_ptr<float>() + start_inp,
+        //         kH, kW, rH, rW,
+        //         patch, channels,
+        //         height, width,
+        //         per_channel,
+        //         grad_weight.data_ptr<float>() + start_out
+        // );
+        AT_DISPATCH_FLOATING_TYPES_AND_HALF(x_ori.type(), "weighting_cuda_backward_weight", 
+            ([&] {
+                f_cc2k<scalar_t, float> (
+                        at::cuda::getCurrentCUDAStream(),
+                        grad_out_row.data_ptr<scalar_t>(),
+                        x_ori.data_ptr<scalar_t>() + start_inp,
+                        kH, kW, rH, rW,
+                        patch, channels,
+                        height, width,
+                        per_channel,
+                        grad_weight.data_ptr<scalar_t>() + start_out
+                );
+            }
+            )
+            );
         start_inp += per_input;
         start_out += per_output;
     }

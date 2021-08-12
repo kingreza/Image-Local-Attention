@@ -1,6 +1,46 @@
 #include "utils.cuh"
 #include <math.h>
 
+// template<typename dt, typename dtc>
+// __global__ void cc2k(
+//         const dt *x_ori,
+//         const dt *x_loc,
+//         const int kH,
+//         const int kW,
+//         const int rH,
+//         const int rW,
+//         const int patch,
+//         const int channels,
+//         const int height,
+//         const int width,
+//         const int per_channel,
+//         dt *y
+// ) {
+//     // x_ori, x_loc: {c, h, w}
+//     // y: {h, w, k^2}
+//     for (int indexO = blockIdx.x; indexO < per_channel; indexO += gridDim.x) { // speed up via KERNEL_LOOP1d?
+//         const int w_ori = indexO % width - rW;
+//         const int h_ori = indexO / width - rH;
+
+//         KERNEL_LOOP(indexK, patch) {
+//             const int w = w_ori + indexK % kW;
+//             const int h = h_ori + indexK / kW;
+//             dtc val = dtc(0);
+
+//             if (h > -1 && h < height && w > -1 && w < width) {
+//                 const dt *p_ori = x_ori + indexO;
+//                 const dt *p_loc = x_loc + h * width + w;
+//                 for (int c = 0; c < channels; ++c) {
+//                     val += static_cast<dtc> (__ldg(p_ori) * __ldg(p_loc));
+//                     p_ori += per_channel;
+//                     p_loc += per_channel;
+//                 }
+//             }
+//             y[indexO * patch + indexK] = static_cast<dt> (val);
+//         }
+//     }
+// }
+
 template<typename dt, typename dtc>
 __global__ void cc2k(
         const dt *x_ori,
@@ -18,11 +58,14 @@ __global__ void cc2k(
 ) {
     // x_ori, x_loc: {c, h, w}
     // y: {h, w, k^2}
-    for (int indexO = blockIdx.x; indexO < per_channel; indexO += gridDim.x) {
+    KERNEL_LOOP1d(index, per_channel * patch){
+        const int indexO = index / patch;
+        const int indexK = index % patch;
+    // for (int indexO = blockIdx.x; indexO < per_channel; indexO += gridDim.x) { // speed up via KERNEL_LOOP1d?
         const int w_ori = indexO % width - rW;
         const int h_ori = indexO / width - rH;
 
-        KERNEL_LOOP(indexK, patch) {
+        // KERNEL_LOOP(indexK, patch) {
             const int w = w_ori + indexK % kW;
             const int h = h_ori + indexK / kW;
             dtc val = dtc(0);
@@ -37,7 +80,7 @@ __global__ void cc2k(
                 }
             }
             y[indexO * patch + indexK] = static_cast<dt> (val);
-        }
+        // }
     }
 }
 
@@ -64,14 +107,14 @@ __global__ void ck2c_ori(
         const int w_ori = index_ % width - rW;
         const int h_ori = index_ / width - rH;
         const dt *p_weight = x_weight + index_ * patch;
-        const dt *p_loc = x_loc + index - index_;
+        const dt *p_loc = x_loc + index - index_; // TODO modify for small key
         dtc val = dtc(0);
 
         for (int indexK = 0; indexK < patch; ++indexK) {
             const int w = w_ori + indexK % kW;
             const int h = h_ori + indexK / kW;
             if (h > -1 && h < height && w > -1 && w < width) {
-                val += static_cast<dtc> (__ldg(p_loc + width * h + w) *
+                val += static_cast<dtc> (__ldg(p_loc + width * h + w) * // TODO modify for small key
                         __ldg(p_weight + indexK));
             }
         }
@@ -98,7 +141,7 @@ __global__ void ck2c_loc(
     // x_weight: {h, w, k^2}
     // y: {c, h, w}
     KERNEL_LOOP1d(index, per_inp) {
-        const int index_ = index % per_channel;
+        const int index_ = index % per_channel; // TODO modify for small key 
         const int w_ori = index_ % width + rW;
         const int h_ori = index_ / width + rH;
         const dt *p_ori = x_ori + index - index_;

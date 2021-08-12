@@ -1,6 +1,7 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <ATen/cuda/CUDAContext.h>
+#include <ATen/AccumulateType.h>
 #include <torch/extension.h>
 #include <cstdio>
 
