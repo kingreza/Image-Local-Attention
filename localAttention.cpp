@@ -17,17 +17,16 @@ torch::Tensor similar_forward(
 }
 
 torch::Tensor similar_backward(
-        const torch::Tensor &x,
+        const torch::Tensor &x_ori,
+        const torch::Tensor &x_loc,
         const torch::Tensor &grad_out,
         const int kH,
         const int kW,
-        const int batch_loc,
         const bool is_ori,
         const bool casual_mask) {
     return similar_cuda_backward(
-            x, grad_out,
+            x_ori, x_loc, grad_out,
             kH, kW,
-            batch_loc,
             is_ori, casual_mask);
 }
 
@@ -44,25 +43,26 @@ torch::Tensor weighting_forward(
 }
 
 torch::Tensor weighting_backward_ori(
+        const torch::Tensor &x_ori,
         const torch::Tensor &x_weight,
         const torch::Tensor &grad_out,
         const int kH,
         const int kW,
-        const int batch_ori,
         const bool casual_mask) {
     return weighting_cuda_backward_ori(
-            x_weight, grad_out,
-            kH, kW, batch_ori, casual_mask);
+            x_ori, x_weight, grad_out,
+            kH, kW, casual_mask);
 }
 
 torch::Tensor weighting_backward_weight(
         const torch::Tensor &x_ori,
+        const torch::Tensor &x_weight,
         const torch::Tensor &grad_out,
         const int kH,
         const int kW,
         const bool casual_mask) {
     return weighting_cuda_backward_weight(
-            x_ori, grad_out,
+            x_ori, x_weight, grad_out,
             kH, kW, casual_mask);
 }
 

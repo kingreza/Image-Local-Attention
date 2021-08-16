@@ -10,12 +10,21 @@ torch::Tensor weighting_cuda_forward(
     TypeCheck(x_weight);
     const int batch = x_weight.size(0);
     const int channels = x_ori.size(1);
-    const int height = x_ori.size(2);
-    const int width = x_ori.size(3);
+    const int height = x_weight.size(1);
+    const int width = x_weight.size(2);
     AT_ASSERTM(!casual_mask || (kH & 1 == 1 && kW & 1 == 1), "If casual_mask is true, the kernel size must be odd!");
 
     const int batch_ori = x_ori.size(0);
+    const int channels_ori = x_ori.size(1);
+    const int height_ori = x_ori.size(2);
+    const int width_ori = x_ori.size(3);
+    const int per_channel_ori = height_ori * width_ori;
+    const int per_input_ori = per_channel_ori * channels_ori;
     AT_ASSERTM(batch % batch_ori == 0, "cannot use auto expand");
+    AT_ASSERTM(height % height_ori == 0, "height cannot be divided exactly");
+    AT_ASSERTM(width % width_ori == 0, "width cannot be divided exactly");
+    const int ah = height / height_ori;
+    const int aw = width / width_ori;
 
     const int rH = kH >> 1;
     const int rW = kW >> 1;
@@ -36,9 +45,10 @@ torch::Tensor weighting_cuda_forward(
                             x_weight.data_ptr<scalar_t>() + start_out,
                             kH, kW, rH, rW,
                             patch, channels,
-                            height, width,
-                            per_channel, per_input,
-                            output.data_ptr<scalar_t>() + start_inp
+                            height_ori, width_ori,
+                            per_channel_ori, per_input_ori,
+                            output.data_ptr<scalar_t>() + start_inp,
+                            ah, aw
                     );
                 }
                 )
@@ -46,7 +56,7 @@ torch::Tensor weighting_cuda_forward(
             start_inp += per_input;
             start_out += per_output;
         }
-        start_inp_ori += per_input;
+        start_inp_ori += per_input_ori;
     }
 
     return output;
@@ -55,10 +65,10 @@ torch::Tensor weighting_cuda_forward(
 //////////////////////////////////////////////////////////////
 
 torch::Tensor weighting_cuda_backward_ori(
+        const torch::Tensor &x_ori,
         const torch::Tensor &x_weight,
         const torch::Tensor &grad_out,
         const int kH, const int kW,
-        const int batch_ori,
         const bool casual_mask
 ) {
     TypeCheck(x_weight);
@@ -66,7 +76,18 @@ torch::Tensor weighting_cuda_backward_ori(
     const int channels = grad_out.size(1);
     const int height = x_weight.size(1);
     const int width = x_weight.size(2);
+
+    const int batch_ori = x_ori.size(0);
+    const int channels_ori = x_ori.size(1);
+    const int height_ori = x_ori.size(2);
+    const int width_ori = x_ori.size(3);
+    const int per_channel_ori = height_ori * width_ori;
+    const int per_input_ori = per_channel_ori * channels_ori;
     AT_ASSERTM(batch % batch_ori == 0, "cannot use auto expand");
+    AT_ASSERTM(height % height_ori == 0, "height cannot be divided exactly");
+    AT_ASSERTM(width % width_ori == 0, "width cannot be divided exactly");
+    const int ah = height / height_ori;
+    const int aw = width / width_ori;
 
     const int rH = kH >> 1;
     const int rW = kW >> 1;
@@ -74,7 +95,7 @@ torch::Tensor weighting_cuda_backward_ori(
     const int per_channel = height * width;
     const int per_input = per_channel * channels;
     const int per_output = per_channel * patch;
-    auto grad_ori = torch::empty({batch_ori, channels, height, width}, x_weight.options());
+    auto grad_ori = torch::empty({batch_ori, channels, height_ori, width_ori}, x_weight.options());
 
     int start_inp = 0, start_out = 0;
     for (int j=0; j<batch_ori; ++j){
@@ -90,10 +111,11 @@ torch::Tensor weighting_cuda_backward_ori(
                             x_weight.data_ptr<scalar_t>() + start_out,
                             kH, kW, rH, rW,
                             patch, channels,
-                            height, width,
-                            per_channel, per_input,
+                            height_ori, width_ori,
+                            per_channel_ori, per_input_ori,
                             grad_ori.data_ptr<scalar_t>() + start_inp,
-                            is_accumulate
+                            is_accumulate,
+                            ah, aw
                     );
                 }
                 )
@@ -101,7 +123,7 @@ torch::Tensor weighting_cuda_backward_ori(
             start_out += per_output;
             is_accumulate = true;
         }
-        start_inp += per_input;
+        start_inp += per_input_ori;
     }
     return grad_ori;
 }
@@ -110,6 +132,7 @@ torch::Tensor weighting_cuda_backward_ori(
 
 torch::Tensor weighting_cuda_backward_weight(
         const torch::Tensor &x_ori,
+        const torch::Tensor &x_weight,
         const torch::Tensor &grad_out,
         const int kH, const int kW,
         const bool casual_mask
@@ -117,10 +140,20 @@ torch::Tensor weighting_cuda_backward_weight(
     TypeCheck(x_ori);
     const int batch = grad_out.size(0);
     const int channels = x_ori.size(1);
-    const int height = x_ori.size(2);
-    const int width = x_ori.size(3);
+    const int height = grad_out.size(2);
+    const int width = grad_out.size(3);
 
     const int batch_ori = x_ori.size(0);
+    const int channels_ori = x_ori.size(1);
+    const int height_ori = x_ori.size(2);
+    const int width_ori = x_ori.size(3);
+    const int per_channel_ori = height_ori * width_ori;
+    const int per_input_ori = per_channel_ori * channels_ori;
+    AT_ASSERTM(batch % batch_ori == 0, "cannot use auto expand");
+    AT_ASSERTM(height % height_ori == 0, "height cannot be divided exactly");
+    AT_ASSERTM(width % width_ori == 0, "width cannot be divided exactly");
+    const int ah = height / height_ori;
+    const int aw = width / width_ori;
 
     const int rH = kH >> 1;
     const int rW = kW >> 1;
@@ -144,16 +177,17 @@ torch::Tensor weighting_cuda_backward_weight(
                             x_ori.data_ptr<scalar_t>() + start_inp,
                             kH, kW, rH, rW,
                             patch, channels,
-                            height, width,
-                            per_channel,
-                            grad_weight.data_ptr<scalar_t>() + start_out
+                            height_ori, width_ori,
+                            per_channel_ori,
+                            grad_weight.data_ptr<scalar_t>() + start_out,
+                            ah, aw
                     );
                 }
                 )
                 );
             start_out += per_output;
         }
-        start_inp += per_input;
+        start_inp += per_input_ori;
     }
 
     return grad_weight;
