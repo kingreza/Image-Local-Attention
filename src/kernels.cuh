@@ -82,7 +82,7 @@ __global__ void cc2k(
                 const dt *p_ori = x_ori + idx_seq;
                 const dt *p_loc = x_loc + h * width + w;
                 for (int c = 0; c < channels; ++c) {
-                    val += static_cast<dtc> (__ldg(p_ori) * __ldg(p_loc));
+                    val += static_cast<dtc>(__ldg(p_ori)) * static_cast<dtc>(__ldg(p_loc));
                     p_ori += per_channel_ori;
                     p_loc += per_channel;
                 }
