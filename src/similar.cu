@@ -47,7 +47,7 @@ torch::Tensor similar_cuda_forward(
                             kH, kW, rH, rW,
                             patch, channels, height_loc, width_loc,
                             per_channel_loc,
-                            output.data_ptr<scalar_t>() + start_out, ah, aw
+                            output.data_ptr<scalar_t>() + start_out, ah, aw, true
                         );
                 }
                 )
