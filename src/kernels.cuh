@@ -87,7 +87,7 @@ __global__ void cc2k(
                     p_ori += per_channel_ori;
                     p_loc += per_channel;
                 }
-            } else val = dtc(-10000);
+            } else if (fill_neginf) val = dtc(-10000);
             y[idx_seq * patch + indexK] = static_cast<dt> (val);
         // }
     }

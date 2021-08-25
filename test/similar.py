@@ -7,7 +7,7 @@ import time
 def check(a, b):
     tmp = torch.max(torch.stack((a.abs(), b.abs())), dim=0)[0]
     idx = tmp > 0
-    return ( (a-b).abs()[idx] / tmp[idx]) .max()
+    # return ( (a-b).abs()[idx] / tmp[idx]) .max()
     return (a-b).abs().max()
 
 def test_correct2(h, w, c, kh, kw, casual_mask=False):
@@ -51,7 +51,7 @@ def test_correct2(h, w, c, kh, kw, casual_mask=False):
 
     
 def test_correct(h, w, c, kh, kw, casual_mask=False):
-    x1 = torch.rand(40, c, h, w).cuda()/64
+    x1 = torch.rand(40, c, h, w).cuda()
     y1 = torch.rand(40, c, h, w).cuda()
     x2 = x1.clone()#.half()
     y2 = y1.clone()#.half()
@@ -61,12 +61,13 @@ def test_correct(h, w, c, kh, kw, casual_mask=False):
     y2.requires_grad_()
     z1 = TorchLocalAttention.f_similar(x1, y1, kh, kw, casual_mask)
     z2 = f_similar(x2, y2, kh, kw, casual_mask)
-    z2 = z2 * (z2>-1)
-    grad = torch.rand(z1.size()).cuda()
+    # z2 = z2 * (z2>-1000)
+    grad = torch.ones(z1.size()).cuda()
 
-    z1.backward(grad)
-    z2.backward(grad)
-
+    z1.sum().backward()
+    z2.sum().backward()
+    # z1.backward(grad)
+    # z2.backward(grad)
     err1 = check(z1.data, z2.data)
     err2 = check(x1.grad.data, x2.grad.data)
     err3 = check(y1.grad.data, y2.grad.data)
@@ -167,7 +168,7 @@ if __name__ == '__main__':
             for block in [9]:
                 print("input:{} channel:{} block:{}".format(im, c, block))
                 # test_correct2(im, im, c, block, block)
-                test_correct(im, im, c, block, block, True)
+                test_correct(im, im, c, block, block, False)
                 # test_efficiency_forward(im, im, c, block, block)
                 # test_efficiency_forward(im, im, c, block, block, True)
                 # test_efficiency_backward(im, im, c, block, block)

@@ -7,7 +7,7 @@ import time
 def check(a, b):
     tmp = torch.max(torch.stack((a.abs(), b.abs())), dim=0)[0]
     idx = tmp > 0
-    return ( (a-b).abs()[idx] / tmp[idx]) .max()
+    # return ( (a-b).abs()[idx] / tmp[idx]) .max()
     return (a-b).abs().max()
 
 def test_correct2(h, w, c, kh, kw, casual_mask=False):
@@ -52,8 +52,8 @@ def test_correct2(h, w, c, kh, kw, casual_mask=False):
 
 def test_correct(h, w, c, kh, kw, casual_mask=False):
     patch = kh*kw // 2 +1 if casual_mask else kh*kw 
-    x1 = torch.rand(4, c, h, w).cuda()
-    y1 = torch.rand(4, h, w, patch).cuda()
+    x1 = torch.rand(4, c, h, w).cuda() * 10
+    y1 = torch.rand(4, h, w, patch).cuda() * 10
     x2 = x1.clone()
     y2 = y1.clone()
 
@@ -64,8 +64,7 @@ def test_correct(h, w, c, kh, kw, casual_mask=False):
 
     z1 = TorchLocalAttention.f_weighting(x1, y1, kh, kw, casual_mask)
     z2 = f_weighting(x2, y2, kh, kw, casual_mask)
-
-    grad = torch.rand(z1.size()).cuda()
+    grad = torch.rand(z1.size()).cuda() * 100
 
     z1.backward(grad)
     z2.backward(grad)
@@ -167,9 +166,9 @@ if __name__ == '__main__':
         for c in [64]:
             for block in [9]:
                 print("input:{} channel:{} block:{}".format(im, c, block))
-                test_correct(im, im, c, block, block)
-                test_correct2(im, im, c, block, block, True)
-                test_efficiency_forward(im, im, c, block, block)
-                test_efficiency_forward(im, im, c, block, block, True)
-                test_efficiency_backward(im, im, c, block, block)
-                test_efficiency_backward(im, im, c, block, block, True)
+                test_correct(im, im, c, block, block, True)
+                # test_correct2(im, im, c, block, block, True)
+                # test_efficiency_forward(im, im, c, block, block)
+                # test_efficiency_forward(im, im, c, block, block, True)
+                # test_efficiency_backward(im, im, c, block, block)
+                # test_efficiency_backward(im, im, c, block, block, True)
