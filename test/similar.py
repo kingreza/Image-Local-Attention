@@ -29,6 +29,7 @@ def test_correct2(h, w, c, kh, kw, casual_mask=False):
 
     z1 = TorchLocalAttention.f_similar(x1, y1t, kh, kw, casual_mask)
     z2 = f_similar(x2, y2, kh, kw, casual_mask)
+    z2 = z2 * (z2>-1)
     x3t = x3.view(8, 2, 2, c, h, w).permute(0, 3, 4, 1, 5, 2).reshape(8, c, h * 2, w * 2)
     z3 = f_similar(x3t, y3, kh, kw, casual_mask).view(8, h, 2, w, 2, -1).permute(0, 2, 4, 1, 3, 5).reshape(32, h, w, -1)
     grad = torch.rand(z1.size()).cuda()
@@ -50,8 +51,8 @@ def test_correct2(h, w, c, kh, kw, casual_mask=False):
 
     
 def test_correct(h, w, c, kh, kw, casual_mask=False):
-    x1 = torch.rand(4, c, h, w).cuda()
-    y1 = torch.rand(4, c, h, w).cuda()
+    x1 = torch.rand(40, c, h, w).cuda()/64
+    y1 = torch.rand(40, c, h, w).cuda()
     x2 = x1.clone()#.half()
     y2 = y1.clone()#.half()
     x1.requires_grad_()
@@ -60,6 +61,7 @@ def test_correct(h, w, c, kh, kw, casual_mask=False):
     y2.requires_grad_()
     z1 = TorchLocalAttention.f_similar(x1, y1, kh, kw, casual_mask)
     z2 = f_similar(x2, y2, kh, kw, casual_mask)
+    z2 = z2 * (z2>-1)
     grad = torch.rand(z1.size()).cuda()
 
     z1.backward(grad)
@@ -165,10 +167,10 @@ if __name__ == '__main__':
             for block in [9]:
                 print("input:{} channel:{} block:{}".format(im, c, block))
                 # test_correct2(im, im, c, block, block)
-                # test_correct(im, im, c, block, block, True)
+                test_correct(im, im, c, block, block, True)
                 # test_efficiency_forward(im, im, c, block, block)
                 # test_efficiency_forward(im, im, c, block, block, True)
                 # test_efficiency_backward(im, im, c, block, block)
-                test_efficiency_backward(im, im, c, block, block, True)
+                # test_efficiency_backward(im, im, c, block, block, True)
 
     

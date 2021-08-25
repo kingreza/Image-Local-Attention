@@ -56,7 +56,8 @@ __global__ void cc2k(
         const int per_channel,
         dt *y,
         const int ah=1,
-        const int aw=1
+        const int aw=1,
+        const int fill_neginf=false
 ) {
     // x_ori, x_loc: {c, h, w}
     // y: {h, w, k^2}
@@ -86,7 +87,7 @@ __global__ void cc2k(
                     p_ori += per_channel_ori;
                     p_loc += per_channel;
                 }
-            }
+            } else val = dtc(-10000);
             y[idx_seq * patch + indexK] = static_cast<dt> (val);
         // }
     }
@@ -209,13 +210,13 @@ void f_cc2k(
         const int height,
         const int width,
         const int per_channel,
-        dt *y, const int ah, const int aw) {
+        dt *y, const int ah, const int aw, const bool fill_neginf=false) {
     cc2k<dt, dtc> <<< min(per_channel, MAX_PIXELS_2d), CUDA_NUM_THREADS, 0, stream >>> (
             x_ori, x_loc,
                     kH, kW, rH, rW,
                     patch, channels,
                     height, width, per_channel,
-                    y, ah, aw);
+                    y, ah, aw,  fill_neginf);
 }
 
 template<typename dt, typename dtc>
