@@ -1,5 +1,8 @@
 # Image Local Attention: a Better PyTorch Implementation
 
+## Notice for Modification
+This repo is based on Zhendong Zhang's framework. We modify the implementation at a large margin for causal-mask attention, cross-resolution attention and speed it up.
+
 ## Introduction
 
 Attention is widely used in deep learning now. Given a query and a collection of key-value pairs, the output of an attention module is the weighted sum of all values. The weights are obtained based on the similarities between the query and keys which are usually measured by their inner products. However, when the number of keys is large, it is expensive to apply such a module.
