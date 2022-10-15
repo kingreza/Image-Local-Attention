@@ -7,7 +7,6 @@ sources = ['src/similar.cu',
            'localAttention.cpp']
 
 if __name__ == '__main__':
-    assert cuda.is_available(), 'Please install CUDA for GPU support.'
     extra_compile_args = {"nvcc": [
         "-DCUDA_HAS_FP16=1",
         "-D__CUDA_NO_HALF_OPERATORS__",
